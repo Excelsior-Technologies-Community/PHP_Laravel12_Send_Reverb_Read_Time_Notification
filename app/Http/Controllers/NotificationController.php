@@ -6,11 +6,12 @@ use App\Events\NotificationEvent;
 use App\Models\Notification;
 use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 
 class NotificationController extends Controller
 {
-    // Send notification
+    /**
+     * Send Notification
+     */
     public function sendNotification(Request $request)
     {
         $request->validate([
@@ -19,9 +20,9 @@ class NotificationController extends Controller
             'type' => 'required|string'
         ]);
 
-        $user = User::find($request->user_id);
+        $user = User::findOrFail($request->user_id);
 
-        // Create notification in database
+        // Store notification
         $notification = Notification::create([
             'type' => $request->type,
             'notifiable_type' => User::class,
@@ -33,80 +34,161 @@ class NotificationController extends Controller
             ]
         ]);
 
-        // Prepare data for broadcast
-        $broadcastData = [
+        // Broadcast Notification
+        broadcast(new NotificationEvent([
             'id' => $notification->id,
             'user_id' => $user->id,
             'message' => $request->message,
             'type' => $request->type,
             'sent_at' => $notification->created_at->diffForHumans(),
             'read' => false
-        ];
-
-        // Broadcast the event
-        broadcast(new NotificationEvent($broadcastData));
+        ]));
 
         return response()->json([
             'success' => true,
-            'message' => 'Notification sent successfully',
+            'message' => 'Notification sent successfully.',
             'notification' => $notification
         ]);
     }
 
-    // Mark notification as read
+    /**
+     * Mark Notification As Read
+     */
     public function markAsRead($id)
     {
         $notification = Notification::findOrFail($id);
-        
-        if (!$notification->read_at) {
-            $notification->update(['read_at' => now()]);
 
-            // Broadcast read status update
-            broadcast(new NotificationEvent([
-                'id' => $notification->id,
-                'user_id' => $notification->notifiable_id,
-                'type' => 'notification_read',
-                'read' => true,
-                'read_at' => now()->diffForHumans()
-            ]));
-
+        if ($notification->read_at) {
             return response()->json([
-                'success' => true,
-                'message' => 'Notification marked as read'
+                'success' => false,
+                'message' => 'Notification already marked as read.'
             ]);
         }
 
-        return response()->json([
-            'success' => false,
-            'message' => 'Notification already read'
+        $notification->update([
+            'read_at' => now()
         ]);
-    }
 
-    // Get user notifications
-    public function getUserNotifications($userId)
-    {
-        $user = User::findOrFail($userId);
-        $notifications = $user->notifications()
-            ->orderBy('created_at', 'desc')
-            ->get()
-            ->map(function ($notification) {
-                return [
-                    'id' => $notification->id,
-                    'message' => $notification->data['message'],
-                    'type' => $notification->type,
-                    'sent_at' => $notification->created_at->diffForHumans(),
-                    'read' => !is_null($notification->read_at),
-                    'read_at' => $notification->read_at ? $notification->read_at->diffForHumans() : null
-                ];
-            });
+        // Broadcast Read Event
+        broadcast(new NotificationEvent([
+            'id' => $notification->id,
+            'user_id' => $notification->notifiable_id,
+            'type' => 'notification_read',
+            'read' => true,
+            'read_at' => now()->diffForHumans()
+        ]));
 
         return response()->json([
             'success' => true,
-            'notifications' => $notifications
+            'message' => 'Notification marked as read successfully.'
         ]);
     }
 
-    // Get unread count
+    /**
+     * Get User Notifications
+     * Search + Pagination
+     */
+    public function getUserNotifications(Request $request, $userId)
+    {
+        $user = User::findOrFail($userId);
+
+        $search = $request->get('search');
+
+        $query = Notification::where('notifiable_type', User::class)
+            ->where('notifiable_id', $userId)
+            ->orderBy('created_at', 'desc');
+
+        // Search by notification message
+        if (!empty($search)) {
+            $query->where('data->message', 'like', '%' . $search . '%');
+        }
+
+        // Pagination (5 notifications per page)
+        $notifications = $query->paginate(5);
+
+        $notifications->getCollection()->transform(function ($notification) {
+            return [
+                'id' => $notification->id,
+                'message' => $notification->data['message'] ?? '',
+                'type' => $notification->type,
+                'sent_at' => $notification->created_at->diffForHumans(),
+                'read' => !is_null($notification->read_at),
+                'read_at' => $notification->read_at
+                    ? $notification->read_at->diffForHumans()
+                    : null,
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'notifications' => $notifications->items(),
+
+            // Pagination Data
+            'pagination' => [
+                'current_page' => $notifications->currentPage(),
+                'last_page' => $notifications->lastPage(),
+                'per_page' => $notifications->perPage(),
+                'total' => $notifications->total(),
+                'from' => $notifications->firstItem(),
+                'to' => $notifications->lastItem(),
+                'has_more_pages' => $notifications->hasMorePages(),
+            ],
+        ]);
+    }
+
+    /**
+     * Delete Notification
+     */
+    public function deleteNotification($id)
+    {
+        $notification = Notification::findOrFail($id);
+
+        $notification->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Notification deleted successfully.'
+        ]);
+    }
+
+    /**
+     * Dashboard Statistics
+     */
+    public function getStatistics($userId)
+    {
+        $total = Notification::where('notifiable_type', User::class)
+            ->where('notifiable_id', $userId)
+            ->count();
+
+        $read = Notification::where('notifiable_type', User::class)
+            ->where('notifiable_id', $userId)
+            ->whereNotNull('read_at')
+            ->count();
+
+        $unread = Notification::where('notifiable_type', User::class)
+            ->where('notifiable_id', $userId)
+            ->whereNull('read_at')
+            ->count();
+
+        $today = Notification::where('notifiable_type', User::class)
+            ->where('notifiable_id', $userId)
+            ->whereDate('created_at', today())
+            ->count();
+
+        return response()->json([
+            'success' => true,
+            'statistics' => [
+                'total' => $total,
+                'read' => $read,
+                'unread' => $unread,
+                'today' => $today,
+            ]
+        ]);
+    }
+
+    /**
+     * Get Unread Count
+     */
     public function getUnreadCount($userId)
     {
         $count = Notification::where('notifiable_type', User::class)
