@@ -6,6 +6,16 @@ use Illuminate\Notifications\DatabaseNotification;
 
 class Notification extends DatabaseNotification
 {
+    protected $fillable = [
+        'type',
+        'notifiable_type',
+        'notifiable_id',
+        'data',
+        'read_at',
+        'category',
+        'priority',
+    ];
+
     protected $casts = [
         'data' => 'array',
         'read_at' => 'datetime',
