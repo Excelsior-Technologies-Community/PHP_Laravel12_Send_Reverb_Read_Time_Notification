@@ -6,6 +6,8 @@ use App\Events\NotificationEvent;
 use App\Models\Notification;
 use App\Models\User;
 use Illuminate\Http\Request;
+use App\Mail\NotificationMail;
+use Illuminate\Support\Facades\Mail;
 
 class NotificationController extends Controller
 {
@@ -14,35 +16,54 @@ class NotificationController extends Controller
      */
     public function sendNotification(Request $request)
     {
+
         $request->validate([
+
             'user_id' => 'required|exists:users,id',
             'message' => 'required|string|max:255',
-            'type' => 'required|string'
+            'type' => 'required|string',
+            'category' => 'required|string',
+            'priority' => 'required|in:low,medium,high'
+
         ]);
 
-        $user = User::findOrFail($request->user_id);
+        $user = User::findOrFail(
+            $request->user_id
+        );
 
-        // Store notification
         $notification = Notification::create([
+
             'type' => $request->type,
             'notifiable_type' => User::class,
             'notifiable_id' => $user->id,
+            'category' => $request->category,
+            'priority' => $request->priority,
+
             'data' => [
                 'message' => $request->message,
                 'type' => $request->type,
                 'sent_at' => now()->toDateTimeString()
             ]
+
         ]);
 
-        // Broadcast Notification
         broadcast(new NotificationEvent([
             'id' => $notification->id,
             'user_id' => $user->id,
             'message' => $request->message,
             'type' => $request->type,
-            'sent_at' => $notification->created_at->diffForHumans(),
-            'read' => false
+            'category' => $request->category,
+            'priority' => $request->priority,
+            'read' => false,
+            'sent_at' => $notification->created_at->diffForHumans()
         ]));
+
+        // Email notification
+
+        Mail::to($user->email)
+            ->send(
+                new NotificationMail($notification)
+            );
 
         return response()->json([
             'success' => true,
@@ -111,6 +132,11 @@ class NotificationController extends Controller
                 'id' => $notification->id,
                 'message' => $notification->data['message'] ?? '',
                 'type' => $notification->type,
+
+                // NEW
+                'category' => $notification->category,
+                'priority' => $notification->priority,
+
                 'sent_at' => $notification->created_at->diffForHumans(),
                 'read' => !is_null($notification->read_at),
                 'read_at' => $notification->read_at

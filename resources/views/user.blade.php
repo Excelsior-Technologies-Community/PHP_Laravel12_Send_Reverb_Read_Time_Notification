@@ -269,11 +269,7 @@
     </div>
 
     <script>
-        const userId = {
-            {
-                $user - > id
-            }
-        };
+const userId = {{ $user->id }};
 
         let currentPage = 1;
 
@@ -424,19 +420,33 @@
 
                 <div>
 
-                    <span class="px-2 py-1 rounded text-xs ${color}">
-                        ${notification.type}
-                    </span>
+<span class="px-2 py-1 rounded text-xs ${color}">
+    ${notification.type}
+</span>
 
-                    ${
-                        !notification.read
-                        ?
-                        `<span class="bg-red-600 text-white text-xs px-2 py-1 rounded ml-2">
-                            NEW
-                        </span>`
-                        :
-                        ""
-                    }
+<span class="px-2 py-1 rounded text-xs bg-purple-100 text-purple-700 ml-2">
+    ${notification.category}
+</span>
+
+<span class="px-2 py-1 rounded text-xs ml-2 ${
+    notification.priority === 'high'
+        ? 'bg-red-100 text-red-700'
+        : notification.priority === 'medium'
+            ? 'bg-yellow-100 text-yellow-700'
+            : 'bg-green-100 text-green-700'
+}">
+    ${notification.priority.toUpperCase()}
+</span>
+
+${
+    !notification.read
+    ?
+    `<span class="bg-red-600 text-white text-xs px-2 py-1 rounded ml-2">
+        NEW
+    </span>`
+    :
+    ""
+}
 
                     <p class="mt-3 font-semibold">
 
