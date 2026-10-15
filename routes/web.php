@@ -27,13 +27,16 @@ Route::get('/user/{id}', [PageController::class, 'user'])->name('user');
 
 Route::prefix('api')->group(function () {
 
-    // Send Notification
+    // Send Notification (Supports Action Text, Action URL, and Preferences check)
     Route::post('/send-notification', [NotificationController::class, 'sendNotification']);
 
-    // Mark Notification as Read
+    // Mark Single Notification as Read
     Route::post('/mark-as-read/{id}', [NotificationController::class, 'markAsRead']);
 
-    // Get Notifications (Search + Pagination)
+    // Mark All Notifications as Read for User
+    Route::post('/mark-all-read/{userId}', [NotificationController::class, 'markAllAsRead']);
+
+    // Get Notifications (Search + Filters + Category Tabs + Pagination + Sorting)
     Route::get('/user-notifications/{userId}', [NotificationController::class, 'getUserNotifications']);
 
     // Delete Notification
@@ -44,4 +47,8 @@ Route::prefix('api')->group(function () {
 
     // Unread Count
     Route::get('/unread-count/{userId}', [NotificationController::class, 'getUnreadCount']);
+
+    // User Notification Preferences & DND Status
+    Route::get('/user-preferences/{userId}', [NotificationController::class, 'getPreferences']);
+    Route::post('/user-preferences/{userId}', [NotificationController::class, 'updatePreferences']);
 });
