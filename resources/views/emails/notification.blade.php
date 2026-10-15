@@ -128,6 +128,13 @@
 
                             <div style="margin-top:35px;text-align:center;">
 
+                                @if(!empty($notification->data['action_text']) && !empty($notification->data['action_url']))
+                                <a href="{{ $notification->data['action_url'] }}"
+                                    style="display:inline-block;background:#7c3aed;color:#ffffff;text-decoration:none;padding:14px 34px;border-radius:8px;font-size:16px;font-weight:bold;margin-right:10px;">
+                                    {{ $notification->data['action_text'] }}
+                                </a>
+                                @endif
+
                                 <a href="{{ url('/') }}"
                                     style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;padding:14px 34px;border-radius:8px;font-size:16px;font-weight:bold;">
                                     Open Application

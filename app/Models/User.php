@@ -21,6 +21,11 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'email_notifications',
+        'sound_notifications',
+        'dnd_enabled',
+        'dnd_start_time',
+        'dnd_end_time',
     ];
 
     /**
@@ -43,6 +48,30 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'email_notifications' => 'boolean',
+            'sound_notifications' => 'boolean',
+            'dnd_enabled' => 'boolean',
         ];
+    }
+
+    /**
+     * Check if Do Not Disturb (DND) mode is currently active.
+     */
+    public function isDndActive(): bool
+    {
+        if (!$this->dnd_enabled) {
+            return false;
+        }
+
+        $now = now()->format('H:i');
+        $start = $this->dnd_start_time ?: '22:00';
+        $end = $this->dnd_end_time ?: '08:00';
+
+        if ($start <= $end) {
+            return $now >= $start && $now <= $end;
+        }
+
+        // Crosses midnight (e.g. 22:00 to 08:00)
+        return $now >= $start || $now <= $end;
     }
 }
